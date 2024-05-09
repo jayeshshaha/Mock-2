@@ -1,0 +1,144 @@
+using System;
+using System.Linq;
+using Microsoft.AspNetCore.Mvc;
+using dotnetapp.Models;
+using dotnetapp.Data;
+using Microsoft.EntityFrameworkCore;
+using dotnetapp.Exceptions;
+
+namespace dotnetapp.Controllers
+{
+    public class BookingController : Controller
+    {
+        private readonly ApplicationDbContext ctx;
+        public BookingController(ApplicationDbContext ctx)
+        {
+            this.ctx = ctx;
+        }
+        public IActionResult Book(int tableId)
+        {
+            // This function is called when the user navigates to /Booking/Book/{tableId}
+            // get the table with the given tableId from the database
+            // if the table does not exist, return a 404 Not Found response
+            // otherwise, return the view for booking a table
+
+            var book = ctx.DiningTables.Include(i => i.Bookings).FirstOrDefault(i => i.DiningTableID == tableId);
+            if(book == null){
+                return NotFound();
+            }
+
+            Booking temp = new Booking();
+            temp.DiningTableID = tableId;
+
+            return View(temp);
+        }
+
+        [HttpPost]
+        public IActionResult Book(int tableId, Booking booking)
+        {
+            // This function is called when the user submits the form to book a table
+            // get the table with the given tableId from the database
+            // if the table does not exist, return a 404 Not Found response
+            // use the ModelState.IsValid property to check if the booking is valid
+            // if the booking is not valid, return the view for booking a table with the validation errors
+            // if the booking date is before 25/4/2024, throw a TableBookingException with the message "Booking Starts from 25/4/2024"
+            // otherwise, add the booking to the database and redirect to the booking details page
+            var table = ctx.DiningTables.Include(i => i.Bookings).FirstOrDefault(i => i.DiningTableID == tableId);
+            if(table == null){
+                return NotFound();
+            }
+            DateTime valDate = new DateTime(2024,4,25);
+            if(booking.ReservationDate <  valDate){
+                throw new TableBookingException("Booking Starts from 25/4/2024");
+            }
+            if(!ModelState.IsValid){
+                return View(booking);
+            }
+
+            Booking temp = new Booking();
+            temp.DiningTableID = tableId;
+            temp.ReservationDate = booking.ReservationDate;
+            ctx.Bookings.Add(temp);
+            ctx.SaveChanges();
+            return RedirectToAction("Details",new {bookingId = temp.BookingID});
+        }
+
+        public IActionResult Details(int bookingId)
+        {
+            // This function is called when the user navigates to /Booking/Details/{bookingId}
+            // get the booking with the given bookingId from the database
+            // if the booking does not exist, return a 404 Not Found response
+            // otherwise, return the view for booking details
+            Console.WriteLine(bookingId);
+            var book = ctx.Bookings.Find(bookingId);
+            if(book == null){
+                return NotFound();
+            }
+            return View(book);
+        }
+    }
+}
+
+------------------
+
+using System;
+using System.Linq;
+using Microsoft.AspNetCore.Mvc;
+using dotnetapp.Models;
+using dotnetapp.Data;
+using System.Collections.Generic;
+
+
+
+namespace dotnetapp.Controllers
+{
+    public class TableController : Controller
+    {
+        private readonly ApplicationDbContext ctx;
+        public TableController(ApplicationDbContext ctx)
+        {
+            this.ctx = ctx;
+        }
+
+        public IActionResult Index()
+        {
+            // This function is called when the user navigates to /Table/Index
+            // get all the tables from the database
+            // return the view for listing all the tables
+            List<DiningTable> diningTables = ctx.DiningTables.ToList();
+            return View(diningTables);
+        }
+
+        public IActionResult DeleteConfirm(int tableId)
+        {
+            // This function is called when the user navigates to /Table/DeleteConfirm/{tableId}
+            // get the table with the given tableId from the database
+            // if the table does not exist, return a 404 Not Found response
+            // otherwise, return the view for confirming the deletion of the table
+            // Console.WriteLine(tableId);
+            var table = ctx.DiningTables.Find(tableId);
+            if(table == null){
+                return NotFound();
+            }
+            return View(table);
+        }
+
+        public IActionResult Delete(int id)
+        {
+            // This function is called when the user navigates to /Table/Delete/{tableId}
+            // get the table with the given tableId from the database
+            // if the table does not exist, return a 404 Not Found response
+            // otherwise, delete the table from the database and redirect to the Index action
+            int tableId = id;
+            Console.WriteLine(tableId);
+            var table = ctx.DiningTables.Find(tableId);
+            if(table == null){
+                return NotFound();
+            }
+            ctx.DiningTables.Remove(table);
+            ctx.SaveChanges();
+            return RedirectToAction("Index");
+        }
+    }
+}
+
